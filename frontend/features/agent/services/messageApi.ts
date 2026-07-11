@@ -79,6 +79,7 @@ export async function fetchMessages(
     `${apiUrl("/messages")}?conversation_id=${conversationId}&include_ai_messages=${includeAIMessages}`,
     {
       cache: "no-store",
+      headers: getAgentHeaders(),
     }
   );
   if (!res.ok) {

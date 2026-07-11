@@ -65,3 +65,16 @@ doc/
 
 # ---- 用户上传文件（隐私文件，不要上传） ----
 backend/uploads/
+
+# ---- Claude Code ----
+.claude/
+
+# ---- 离线数据文件（通过脚本下载） ----
+backend/data/*.xdb
+
+# ---- 本地模型文件 ----
+models/
+
+# ---- 个人开发笔记 ----
+docs/frontend-oom-fix-note.md
+docs/setup-log-20250630.md
