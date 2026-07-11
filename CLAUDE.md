@@ -502,6 +502,17 @@ docker-compose exec backend sh            # 进入后端容器
 
 **前端源文件目录清单**: `app/`, `components/`, `features/`, `hooks/`, `lib/`, `utils/` — 添加新目录时同步更新 `globals.css`。
 
+## 开发日志
+
+### 2026-07-11（Yiming — 环境搭建与初始化）
+
+- Git 环境：SSH key 已配置，远端 `git@github.com:Catman246/AI-boss.git`，分支 `yiming`
+- 修复 `fetchMessages` 缺少 `X-User-Id` header 导致 403
+- 修复前端 OOM：`globals.css` 加 `@source` 限制 Tailwind 扫描范围
+- 后端 `ai_configs` 表写入 Kimi K2.6 配置（复用 agent-service 的 API Key）
+- 更新 `.gitignore`：忽略 `.claude/`、`*.xdb`、`models/`、个人笔记
+- 首次 push 到远端 `yiming` 分支成功
+
 <!-- superpowers-zh:begin (do not edit between these markers) -->
 # Superpowers-ZH 中文增强版
 

@@ -75,6 +75,9 @@ backend/data/*.xdb
 # ---- 本地模型文件 ----
 models/
 
+# ---- 个人需求文档 ----
+分工要求.md
+
 # ---- 个人开发笔记 ----
 docs/frontend-oom-fix-note.md
 docs/setup-log-20250630.md
