@@ -133,6 +133,29 @@ export interface RecruitmentAgentEvent {
   message: string;
 }
 
+// Chat Draft API — 调用 POST /agent/recruitment/chat-draft
+
+export interface ChatMessage {
+  role: "candidate" | "recruiter";
+  content: string;
+}
+
+export interface ChatDraftInput {
+  requirement_id: number;
+  candidate_id: number;
+  messages: ChatMessage[];
+}
+
+export interface ChatDraftResult {
+  draft: string;
+  follow_up_questions: string[];
+  scene: string;
+}
+
+export interface ChatDraftResponse {
+  result: ChatDraftResult;
+}
+
 export interface RecruitmentAgentResult {
   thread_id: string;
   stage: string;
@@ -272,6 +295,17 @@ export async function generateRecruitmentDraft(candidateId: number): Promise<str
   if (!res.ok) throw await parseApiError(res, "生成话术失败");
   const data: { draft?: string } = await res.json();
   return data.draft ?? "";
+}
+
+export async function generateChatDraft(input: ChatDraftInput): Promise<ChatDraftResult> {
+  const res = await fetch(apiUrl("/agent/recruitment/chat-draft"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAgentHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw await parseApiError(res, "生成话术失败");
+  const data: ChatDraftResponse = await res.json();
+  return data.result;
 }
 
 export async function runRecruitmentAgent(
