@@ -89,26 +89,42 @@ export function AIDraftPanel({
 
   const sceneLabel = SCENE_LABELS[selectedScene] || selectedScene;
 
-  // 没有草稿：显示生成入口（按钮原地 loading，不整个替换）
+  // 没有草稿：显示场景分类 + 生成入口
   if (!draft) {
     return (
       <div className="rounded-md border border-dashed p-4">
-        <div className="flex flex-col items-center gap-3 text-center">
+        <div className="flex flex-col items-center gap-3">
           <Sparkles className="h-5 w-5 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">生成 AI 话术草稿</p>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={generating}
-            onClick={() => void handleGenerate()}
-          >
-            {generating ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
-            )}
-            {generating ? "生成中..." : "生成话术"}
-          </Button>
+          <div className="text-center">
+            <p className="text-sm font-medium text-foreground">AI 话术生成</p>
+            <p className="text-xs text-muted-foreground mt-1">选择场景，AI 自动生成对应风格的回复</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedScene}
+              onChange={(e) => setSelectedScene(e.target.value)}
+              disabled={generating}
+              className="h-8 rounded border bg-background px-2 text-sm disabled:opacity-50"
+            >
+              {SCENES.map((s) => (
+                <option key={s} value={s}>
+                  {SCENE_LABELS[s]}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              disabled={generating}
+              onClick={() => void handleGenerate()}
+            >
+              {generating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              {generating ? "生成中..." : "生成"}
+            </Button>
+          </div>
         </div>
       </div>
     );
