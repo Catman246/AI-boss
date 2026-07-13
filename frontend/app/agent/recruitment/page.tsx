@@ -57,6 +57,8 @@ import {
   type RecruitmentTimelineEvent,
   type UpdateCandidatePayload,
 } from "@/features/agent/services/recruitmentApi";
+import { AIDraftPanel } from "@/components/recruitment/AIDraftPanel";
+import type { ChatDraftResult } from "@/features/agent/services/recruitmentApi";
 
 const CONTACT_STATUS_OPTIONS = [
   { value: "new", label: "待筛选" },
@@ -423,6 +425,8 @@ export default function RecruitmentPage({ embedded = false }: { embedded?: boole
   const [requirementForm, setRequirementForm] = useState<CreateRequirementPayload>(emptyRequirement);
   const [candidateForm, setCandidateForm] = useState<Omit<CreateCandidatePayload, "requirement_id">>(emptyCandidate);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const [chatDrafts, setChatDrafts] = useState<Record<number, ChatDraftResult>>({});
+  const [generatingChatDraftId, setGeneratingChatDraftId] = useState<number | null>(null);
   const [agentResults, setAgentResults] = useState<Record<number, RecruitmentAgentResult>>({});
   const [timelines, setTimelines] = useState<Record<number, RecruitmentTimelineEvent[]>>({});
   const [timelineDrafts, setTimelineDrafts] = useState<Record<number, string>>({});
@@ -865,6 +869,11 @@ export default function RecruitmentPage({ embedded = false }: { embedded?: boole
     } catch {
       toast.error("复制失败");
     }
+  }
+
+  function handleChatDraftGenerated(candidateId: number, result: ChatDraftResult) {
+    setChatDrafts((prev) => ({ ...prev, [candidateId]: result }));
+    setGeneratingChatDraftId(null);
   }
 
   async function handleAddTimelineEvent(candidateId: number) {
@@ -1584,10 +1593,24 @@ export default function RecruitmentPage({ embedded = false }: { embedded?: boole
                         />
                       </div>
 
+                      {/* AI 话术面板 */}
+                      <div className="mt-3">
+                        <AIDraftPanel
+                          requirementId={selectedRequirementId!}
+                          candidateId={candidate.id}
+                          candidateName={candidate.name}
+                          lastMessage={candidate.last_message}
+                          currentRole={candidate.current_role}
+                          draft={chatDrafts[candidate.id] || null}
+                          generating={generatingChatDraftId === candidate.id}
+                          onDraftGenerated={(result) => handleChatDraftGenerated(candidate.id, result)}
+                        />
+                      </div>
+
                       {draft && (
-                        <div className="rounded-md border bg-muted/30 p-3">
+                        <div className="mt-3 rounded-md border bg-muted/30 p-3">
                           <div className="mb-2 flex items-center justify-between gap-2">
-                            <div className="text-sm font-medium">首轮话术</div>
+                            <div className="text-sm font-medium">首轮话术（旧版）</div>
                             <Button variant="outline" size="sm" onClick={() => void handleCopy(draft)}>
                               <Clipboard className="mr-2 h-4 w-4" />
                               复制

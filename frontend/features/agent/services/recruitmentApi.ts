@@ -305,7 +305,7 @@ export async function generateChatDraft(input: ChatDraftInput): Promise<ChatDraf
   });
   if (!res.ok) throw await parseApiError(res, "生成话术失败");
   const data: ChatDraftResponse = await res.json();
-  return data.result;
+  return data.result ?? { draft: "", follow_up_questions: [], scene: "follow_up" };
 }
 
 export async function runRecruitmentAgent(
