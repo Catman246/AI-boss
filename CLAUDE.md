@@ -513,6 +513,26 @@ docker-compose exec backend sh            # 进入后端容器
 - 更新 `.gitignore`：忽略 `.claude/`、`*.xdb`、`models/`、个人笔记
 - 首次 push 到远端 `yiming` 分支成功
 
+### 2026-07-13（Yiming — 招聘 AI 话术系统）
+
+**后端：**
+- 新增 `POST /agent/recruitment/chat-draft` 接口，实现 RAG + LLM 生成招聘话术
+- ChatDraftInput/ChatDraftResult 类型定义，支持 scene 场景分类传参
+- `RecruitmentService` 集成 `retrievalService` + `aiConfigRepo` + `kbRepo`
+- 容错设计：LLM 失败回退到模板话术 `buildRecruitmentDraft`
+- IDOR 修复：校验 `OwnerID` 防止越权访问
+
+**前端：**
+- 新增 `AIDraftPanel` 组件（`frontend/components/recruitment/AIDraftPanel.tsx`）
+- 新增 `generateChatDraft` API 函数 + `ChatDraftResult` 类型
+- 集成到招聘 Agent 页面候选人卡片，展示：场景标签、话术草稿、追问建议
+- 操作按钮：采用草稿（复制）、重新生成、切换场景
+- 体验优化：按钮原地 loading、失败不卡死、首次显示完整场景分类
+
+**待完成：**
+- 前端聊天页面（`/agent/chat/[id]`）尚未接入 AI 话术
+- RAG 嵌入模型未配置（`/health` 503）
+
 <!-- superpowers-zh:begin (do not edit between these markers) -->
 # Superpowers-ZH 中文增强版
 
