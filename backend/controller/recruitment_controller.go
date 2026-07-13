@@ -186,6 +186,26 @@ func (r *RecruitmentController) GenerateDraft(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"draft": draft})
 }
 
+// ChatDraft generates an AI-powered chat draft using RAG + LLM.
+// POST /agent/recruitment/chat-draft
+func (r *RecruitmentController) ChatDraft(c *gin.Context) {
+	if !requirePermission(c, r.users, string(service.PermRecruitment)) {
+		return
+	}
+	var input service.ChatDraftInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+	userID := getUserIDFromHeader(c)
+	result, err := r.service.GenerateChatDraft(c.Request.Context(), userID, input)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"result": result})
+}
+
 func (r *RecruitmentController) ListTimelineEvents(c *gin.Context) {
 	if !requirePermission(c, r.users, string(service.PermRecruitment)) {
 		return

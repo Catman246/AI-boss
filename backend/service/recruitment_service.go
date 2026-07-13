@@ -2,19 +2,27 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
 	"github.com/2930134478/AI-CS/backend/models"
 	"github.com/2930134478/AI-CS/backend/repository"
+	"github.com/2930134478/AI-CS/backend/service/rag"
+	"github.com/2930134478/AI-CS/backend/utils"
 )
 
 type RecruitmentService struct {
-	repo    *repository.RecruitmentRepository
-	agent   *RecruitmentAgentClient
-	docRepo *repository.DocumentRepository
+	repo             *repository.RecruitmentRepository
+	agent            *RecruitmentAgentClient
+	docRepo          *repository.DocumentRepository
+	retrievalService *rag.RetrievalService
+	aiConfigRepo     *repository.AIConfigRepository
+	kbRepo           *repository.KnowledgeBaseRepository
+	providerFactory  *AIProviderFactory
 }
 
 type CreateRecruitmentRequirementInput struct {
@@ -96,8 +104,43 @@ type CreateRecruitmentTimelineEventInput struct {
 	ToStatus    string `json:"to_status"`
 }
 
-func NewRecruitmentService(repo *repository.RecruitmentRepository, agent *RecruitmentAgentClient, docRepo *repository.DocumentRepository) *RecruitmentService {
-	return &RecruitmentService{repo: repo, agent: agent, docRepo: docRepo}
+// ChatDraftInput is the request payload for the chat-draft endpoint.
+type ChatDraftInput struct {
+	RequirementID uint          `json:"requirement_id" binding:"required"`
+	CandidateID   uint          `json:"candidate_id" binding:"required"`
+	Messages      []ChatMessage `json:"messages"`
+}
+
+// ChatMessage represents a single message in the recent chat history.
+type ChatMessage struct {
+	Role    string `json:"role"` // "recruiter" or "candidate"
+	Content string `json:"content"`
+}
+
+// ChatDraftResult is the structured AI response for a chat draft.
+type ChatDraftResult struct {
+	Draft             string   `json:"draft"`
+	FollowUpQuestions []string `json:"follow_up_questions"`
+	Scene             string   `json:"scene"`
+}
+
+func NewRecruitmentService(
+	repo *repository.RecruitmentRepository,
+	agent *RecruitmentAgentClient,
+	docRepo *repository.DocumentRepository,
+	retrievalService *rag.RetrievalService,
+	aiConfigRepo *repository.AIConfigRepository,
+	kbRepo *repository.KnowledgeBaseRepository,
+) *RecruitmentService {
+	return &RecruitmentService{
+		repo:             repo,
+		agent:            agent,
+		docRepo:          docRepo,
+		retrievalService: retrievalService,
+		aiConfigRepo:     aiConfigRepo,
+		kbRepo:           kbRepo,
+		providerFactory:  NewAIProviderFactory(),
+	}
 }
 
 func (s *RecruitmentService) ListRequirements() ([]models.RecruitmentRequirement, error) {
@@ -683,5 +726,235 @@ func normalizeGroupStatus(value string) string {
 		return strings.TrimSpace(value)
 	default:
 		return "not_invited"
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Chat Draft API — RAG + LLM 生成招聘聊天话术
+// ──────────────────────────────────────────────────────────────────
+
+// GenerateChatDraft generates an AI-powered recruitment chat draft using RAG + LLM.
+func (s *RecruitmentService) GenerateChatDraft(ctx context.Context, userID uint, input ChatDraftInput) (*ChatDraftResult, error) {
+	// 1. Load requirement + candidate
+	req, err := s.repo.GetRequirement(input.RequirementID)
+	if err != nil {
+		return nil, fmt.Errorf("requirement not found: %w", err)
+	}
+	candidate, err := s.repo.GetCandidate(input.CandidateID)
+	if err != nil {
+		return nil, fmt.Errorf("candidate not found: %w", err)
+	}
+
+	// 2. RAG retrieval against recruitment talk script KB
+	ragContext := ""
+	if s.retrievalService != nil {
+		ragQuery := buildChatDraftRAGQuery(req, candidate, input.Messages)
+		kbID := s.findRecruitmentKnowledgeBaseID()
+		results, ragErr := s.retrievalService.RetrieveWithRerank(ctx, ragQuery, 5, kbID)
+		if ragErr != nil {
+			log.Printf("[chat-draft] RAG retrieval failed: %v", ragErr)
+		} else if len(results) > 0 {
+			ragContext = formatRAGResults(results)
+		}
+	}
+
+	// 3. Load AI config
+	aiConfig, err := s.aiConfigRepo.GetActiveByUserID(userID, "text")
+	if err != nil {
+		return nil, fmt.Errorf("no active AI text config found for user %d: %w", userID, err)
+	}
+	apiKey, err := utils.DecryptAPIKey(aiConfig.APIKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt API key: %w", err)
+	}
+
+	// 4. Build recruitment-specific prompt
+	systemPrompt := buildChatDraftSystemPrompt(req, candidate, ragContext, input.Messages)
+
+	// 5. Call LLM
+	provider, err := s.providerFactory.CreateProvider(AIConfig{
+		APIURL:    aiConfig.APIURL,
+		APIKey:    apiKey,
+		Model:     aiConfig.Model,
+		ModelType: aiConfig.ModelType,
+		Provider:  aiConfig.Provider,
+	})
+	if err != nil {
+		log.Printf("[chat-draft] create provider failed: %v", err)
+		return s.chatDraftFallback(req, candidate), nil
+	}
+
+	llmResponse, err := provider.GenerateResponse([]MessageHistory{}, systemPrompt, "", "")
+	if err != nil {
+		log.Printf("[chat-draft] LLM call failed: %v", err)
+		return s.chatDraftFallback(req, candidate), nil
+	}
+
+	// 6. Parse structured result
+	result, err := parseChatDraftResponse(llmResponse)
+	if err != nil {
+		log.Printf("[chat-draft] failed to parse LLM response: %v, raw=%s", err, llmResponse)
+		return s.chatDraftFallback(req, candidate), nil
+	}
+
+	// 7. Record timeline event
+	if candidate.ID != 0 {
+		_ = s.addTimelineEvent(candidate, "draft_generated", "AI生成聊天话术",
+			fmt.Sprintf("场景: %s\n话术: %s", result.Scene, result.Draft),
+			"", candidate.ContactStatus)
+	}
+
+	return result, nil
+}
+
+// findRecruitmentKnowledgeBaseID locates the "招聘客服话术" KB by name.
+func (s *RecruitmentService) findRecruitmentKnowledgeBaseID() *uint {
+	if s.kbRepo == nil {
+		return nil
+	}
+	kbs, err := s.kbRepo.List()
+	if err != nil {
+		return nil
+	}
+	for i := range kbs {
+		if kbs[i].Name == "招聘客服话术" {
+			id := kbs[i].ID
+			return &id
+		}
+	}
+	return nil
+}
+
+// buildChatDraftRAGQuery constructs the RAG search query from context.
+func buildChatDraftRAGQuery(req *models.RecruitmentRequirement, candidate *models.RecruitmentCandidate, messages []ChatMessage) string {
+	parts := []string{}
+	if req.Role != "" {
+		parts = append(parts, "岗位: "+req.Role)
+	}
+	if candidate.CurrentRole != "" {
+		parts = append(parts, "候选人当前职位: "+candidate.CurrentRole)
+	}
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "candidate" {
+			parts = append(parts, "候选人最近消息: "+messages[i].Content)
+			break
+		}
+	}
+	if len(parts) == 0 {
+		parts = append(parts, "招聘沟通话术")
+	}
+	return strings.Join(parts, "; ")
+}
+
+// formatRAGResults converts RAG results to prompt context string.
+func formatRAGResults(results []rag.SearchResult) string {
+	var parts []string
+	for i, r := range results {
+		if i >= 5 {
+			break
+		}
+		parts = append(parts, fmt.Sprintf("话术 %d:\n%s", i+1, r.Content))
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+// buildChatDraftSystemPrompt builds the recruitment-specific LLM prompt.
+func buildChatDraftSystemPrompt(req *models.RecruitmentRequirement, candidate *models.RecruitmentCandidate, ragContext string, messages []ChatMessage) string {
+	var b strings.Builder
+	b.WriteString("你是招聘客服助手。请根据以下信息，生成一条可直接发送给候选人的中文回复草稿。\n\n")
+
+	// Requirement context
+	b.WriteString("## 招聘需求\n")
+	b.WriteString(fmt.Sprintf("- 岗位: %s\n", defaultString(req.Role, req.Title)))
+	if req.Location != "" {
+		b.WriteString(fmt.Sprintf("- 地点: %s\n", req.Location))
+	}
+	if req.MustHave != "" {
+		b.WriteString(fmt.Sprintf("- 硬性要求: %s\n", req.MustHave))
+	}
+	if req.NiceHave != "" {
+		b.WriteString(fmt.Sprintf("- 加分条件: %s\n", req.NiceHave))
+	}
+	if req.Description != "" {
+		b.WriteString(fmt.Sprintf("- 岗位描述: %s\n", req.Description))
+	}
+
+	// Candidate context
+	b.WriteString("\n## 候选人信息\n")
+	if candidate.Name != "" {
+		b.WriteString(fmt.Sprintf("- 姓名: %s\n", candidate.Name))
+	}
+	if candidate.CurrentRole != "" {
+		b.WriteString(fmt.Sprintf("- 当前职位: %s\n", candidate.CurrentRole))
+	}
+	if candidate.Location != "" {
+		b.WriteString(fmt.Sprintf("- 所在地: %s\n", candidate.Location))
+	}
+	if candidate.Profile != "" {
+		b.WriteString(fmt.Sprintf("- 个人简介: %s\n", candidate.Profile))
+	}
+	b.WriteString(fmt.Sprintf("- 沟通状态: %s\n", contactStatusText(candidate.ContactStatus)))
+
+	// Chat history
+	if len(messages) > 0 {
+		b.WriteString("\n## 最近聊天记录\n")
+		for _, msg := range messages {
+			roleLabel := "招聘方"
+			if msg.Role == "candidate" {
+				roleLabel = "候选人"
+			}
+			b.WriteString(fmt.Sprintf("- [%s] %s\n", roleLabel, msg.Content))
+		}
+	}
+
+	// RAG knowledge
+	if ragContext != "" {
+		b.WriteString("\n## 参考话术（来自知识库）\n")
+		b.WriteString(ragContext)
+		b.WriteString("\n")
+	}
+
+	// Output format instruction
+	b.WriteString("\n## 输出要求\n")
+	b.WriteString("请以JSON格式输出，包含以下字段:\n")
+	b.WriteString("- draft: 可直接发送的中文回复草稿（自然、简短、像真人招聘沟通；不要使用Markdown）\n")
+	b.WriteString("- follow_up_questions: 建议的1-3个后续追问（用于推进了解岗位意向、工期、经验、地区等）\n")
+	b.WriteString("- scene: 场景分类，从以下选择: greeting(初次打招呼), follow_up(跟进), interview_invite(邀约面试), info_request(索要信息), objection_handling(异议处理), closing(收尾/加微信)\n\n")
+	b.WriteString("只输出JSON，不要包含其他内容。\n")
+	b.WriteString("{\n  \"draft\": \"...\",\n  \"follow_up_questions\": [\"...\"],\n  \"scene\": \"...\"\n}")
+
+	return b.String()
+}
+
+// parseChatDraftResponse extracts structured output from LLM text.
+func parseChatDraftResponse(raw string) (*ChatDraftResult, error) {
+	raw = strings.TrimSpace(raw)
+	// Strip markdown code fences if present
+	if strings.HasPrefix(raw, "```") {
+		raw = strings.TrimPrefix(raw, "```json")
+		raw = strings.TrimPrefix(raw, "```")
+		raw = strings.TrimSuffix(raw, "```")
+		raw = strings.TrimSpace(raw)
+	}
+	var result ChatDraftResult
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+	if strings.TrimSpace(result.Draft) == "" {
+		return nil, fmt.Errorf("draft is empty")
+	}
+	if result.Scene == "" {
+		result.Scene = "follow_up"
+	}
+	return &result, nil
+}
+
+// chatDraftFallback returns a template-based draft when LLM is unavailable.
+func (s *RecruitmentService) chatDraftFallback(req *models.RecruitmentRequirement, candidate *models.RecruitmentCandidate) *ChatDraftResult {
+	draft := buildRecruitmentDraft(req, candidate)
+	return &ChatDraftResult{
+		Draft:             draft,
+		FollowUpQuestions: []string{"请问你近期是否考虑相关工作机会？"},
+		Scene:             "greeting",
 	}
 }

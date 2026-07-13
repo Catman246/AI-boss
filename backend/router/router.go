@@ -136,6 +136,7 @@ func RegisterRoutes(r *gin.Engine, controllers ControllerSet, wsHandler gin.Hand
 		routes.PUT("/agent/recruitment/candidates/:id", controllers.Recruitment.UpdateCandidate)
 		routes.POST("/agent/recruitment/candidates/:id/agent-run", controllers.Recruitment.RunAgent)
 		routes.POST("/agent/recruitment/candidates/:id/draft", controllers.Recruitment.GenerateDraft)
+		routes.POST("/agent/recruitment/chat-draft", controllers.Recruitment.ChatDraft)
 		routes.GET("/agent/recruitment/candidates/:id/timeline", controllers.Recruitment.ListTimelineEvents)
 		routes.POST("/agent/recruitment/candidates/:id/timeline", controllers.Recruitment.CreateTimelineEvent)
 

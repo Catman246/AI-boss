@@ -388,7 +388,7 @@ func main() {
 	if recruitmentAgentClient.Enabled() {
 		log.Printf("✅ 招聘 Agent 服务已配置: %s", recruitmentAgentClient.BaseURL())
 	}
-	recruitmentService := service.NewRecruitmentService(recruitmentRepo, recruitmentAgentClient, docRepo)
+	recruitmentService := service.NewRecruitmentService(recruitmentRepo, recruitmentAgentClient, docRepo, retrievalService, aiConfigRepo, kbRepo)
 	bossAssistantService := service.NewBossAssistantService(appSettingRepo)
 
 	// 声明 Hub 变量（用于在回调函数中访问）
