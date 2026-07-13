@@ -22,9 +22,7 @@ const SCENES = Object.keys(SCENE_LABELS);
 interface AIDraftPanelProps {
   requirementId: number;
   candidateId: number;
-  candidateName: string;
   lastMessage?: string;
-  currentRole?: string;
   /** 已有的草稿结果，null 表示还没生成 */
   draft: ChatDraftResult | null;
   /** 生成中的 loading 状态 */
@@ -40,9 +38,7 @@ interface AIDraftPanelProps {
 export function AIDraftPanel({
   requirementId,
   candidateId,
-  candidateName,
   lastMessage,
-  currentRole,
   draft,
   generating,
   onGenerateStart,
@@ -61,6 +57,7 @@ export function AIDraftPanel({
         requirement_id: requirementId,
         candidate_id: candidateId,
         messages,
+        scene,
       });
       onDraftGenerated(result);
       setSelectedScene(result.scene);

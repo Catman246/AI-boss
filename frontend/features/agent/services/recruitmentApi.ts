@@ -144,6 +144,7 @@ export interface ChatDraftInput {
   requirement_id: number;
   candidate_id: number;
   messages: ChatMessage[];
+  scene?: string;
 }
 
 export interface ChatDraftResult {

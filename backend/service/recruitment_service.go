@@ -109,6 +109,7 @@ type ChatDraftInput struct {
 	RequirementID uint          `json:"requirement_id" binding:"required"`
 	CandidateID   uint          `json:"candidate_id" binding:"required"`
 	Messages      []ChatMessage `json:"messages"`
+	Scene         string        `json:"scene"`
 }
 
 // ChatMessage represents a single message in the recent chat history.
@@ -777,7 +778,7 @@ func (s *RecruitmentService) GenerateChatDraft(ctx context.Context, userID uint,
 	}
 
 	// 4. Build recruitment-specific prompt
-	systemPrompt := buildChatDraftSystemPrompt(req, candidate, ragContext, input.Messages)
+	systemPrompt := buildChatDraftSystemPrompt(req, candidate, ragContext, input.Scene, input.Messages)
 
 	// 5. Call LLM
 	provider, err := s.providerFactory.CreateProvider(AIConfig{
@@ -867,9 +868,16 @@ func formatRAGResults(results []rag.SearchResult) string {
 }
 
 // buildChatDraftSystemPrompt builds the recruitment-specific LLM prompt.
-func buildChatDraftSystemPrompt(req *models.RecruitmentRequirement, candidate *models.RecruitmentCandidate, ragContext string, messages []ChatMessage) string {
+func buildChatDraftSystemPrompt(req *models.RecruitmentRequirement, candidate *models.RecruitmentCandidate, ragContext string, scene string, messages []ChatMessage) string {
 	var b strings.Builder
 	b.WriteString("你是招聘客服助手。请根据以下信息，生成一条可直接发送给候选人的中文回复草稿。\n\n")
+
+	// Scene constraint
+	sceneLabel := sceneLabelText(scene)
+	if sceneLabel != "" {
+		b.WriteString(fmt.Sprintf("## 目标场景：%s\n", sceneLabel))
+		b.WriteString("请围绕此场景生成对应的回复风格。\n\n")
+	}
 
 	// Requirement context
 	b.WriteString("## 招聘需求\n")
@@ -935,6 +943,26 @@ func buildChatDraftSystemPrompt(req *models.RecruitmentRequirement, candidate *m
 }
 
 // parseChatDraftResponse extracts structured output from LLM text.
+// sceneLabelText maps scene codes to Chinese labels for prompt guidance.
+func sceneLabelText(scene string) string {
+	switch scene {
+	case "greeting":
+		return "初次打招呼 —语气自然简短，确认候选人在找工作和所在地"
+	case "follow_up":
+		return "跟进 — 推进了解岗位意向、工期、经验、地区等"
+	case "interview_invite":
+		return "邀约面试/到场 — 收集可面试时间，说明地址和联系人确认后发送"
+	case "info_request":
+		return "索要信息 — 确认年龄、学历、到岗时间等必要信息"
+	case "objection_handling":
+		return "异议处理 — 候选人对薪资/距离/靠谱性有疑虑时，礼貌回应降低顾虑"
+	case "closing":
+		return "收尾/加微信 — 确认意向后引导交换微信或结束沟通"
+	default:
+		return ""
+	}
+}
+
 func parseChatDraftResponse(raw string) (*ChatDraftResult, error) {
 	raw = strings.TrimSpace(raw)
 	// Strip markdown code fences if present

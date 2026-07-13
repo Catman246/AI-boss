@@ -1598,9 +1598,7 @@ export default function RecruitmentPage({ embedded = false }: { embedded?: boole
                         <AIDraftPanel
                           requirementId={selectedRequirementId!}
                           candidateId={candidate.id}
-                          candidateName={candidate.name}
                           lastMessage={candidate.last_message}
-                          currentRole={candidate.current_role}
                           draft={chatDrafts[candidate.id] || null}
                           generating={generatingChatDraftId === candidate.id}
                           onGenerateStart={() => setGeneratingChatDraftId(candidate.id)}
