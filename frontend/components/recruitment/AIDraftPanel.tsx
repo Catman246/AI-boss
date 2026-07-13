@@ -33,6 +33,8 @@ interface AIDraftPanelProps {
   onGenerateStart: () => void;
   /** 当新的 draft 生成时回调 */
   onDraftGenerated: (result: ChatDraftResult) => void;
+  /** 生成结束时回调（无论成功失败）— 父组件清除 loading 状态 */
+  onGenerateComplete: () => void;
 }
 
 export function AIDraftPanel({
@@ -45,6 +47,7 @@ export function AIDraftPanel({
   generating,
   onGenerateStart,
   onDraftGenerated,
+  onGenerateComplete,
 }: AIDraftPanelProps) {
   const [selectedScene, setSelectedScene] = useState<string>(draft?.scene || "greeting");
 
@@ -63,6 +66,8 @@ export function AIDraftPanel({
       setSelectedScene(result.scene);
     } catch (error) {
       toast.error((error as Error).message || "生成话术失败");
+    } finally {
+      onGenerateComplete();
     }
   };
 

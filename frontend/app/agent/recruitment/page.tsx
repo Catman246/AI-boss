@@ -1605,6 +1605,7 @@ export default function RecruitmentPage({ embedded = false }: { embedded?: boole
                           generating={generatingChatDraftId === candidate.id}
                           onGenerateStart={() => setGeneratingChatDraftId(candidate.id)}
                           onDraftGenerated={(result) => handleChatDraftGenerated(candidate.id, result)}
+                          onGenerateComplete={() => setGeneratingChatDraftId(null)}
                         />
                       </div>
 
