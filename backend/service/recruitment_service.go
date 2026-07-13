@@ -745,6 +745,14 @@ func (s *RecruitmentService) GenerateChatDraft(ctx context.Context, userID uint,
 		return nil, fmt.Errorf("candidate not found: %w", err)
 	}
 
+	// Security: verify the user owns both the requirement and candidate
+	if req.OwnerID != userID {
+		return nil, fmt.Errorf("permission denied: requirement does not belong to user")
+	}
+	if candidate.OwnerID != userID {
+		return nil, fmt.Errorf("permission denied: candidate does not belong to user")
+	}
+
 	// 2. RAG retrieval against recruitment talk script KB
 	ragContext := ""
 	if s.retrievalService != nil {
