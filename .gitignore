@@ -81,3 +81,6 @@ models/
 # ---- 个人开发笔记 ----
 docs/frontend-oom-fix-note.md
 docs/setup-log-20250630.md
+
+# ---- 设计规格文档（本地参考，不提交） ----
+docs/superpowers/
