@@ -87,39 +87,44 @@ export function AIDraftPanel({
     void handleGenerate(scene);
   };
 
-  // 没有草稿且不在生成中：显示生成入口
-  if (!draft && !generating) {
+  const sceneLabel = SCENE_LABELS[selectedScene] || selectedScene;
+
+  // 没有草稿：显示生成入口（按钮原地 loading，不整个替换）
+  if (!draft) {
     return (
       <div className="rounded-md border border-dashed p-4">
         <div className="flex flex-col items-center gap-3 text-center">
           <Sparkles className="h-5 w-5 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">生成 AI 话术草稿</p>
-          <Button size="sm" variant="outline" onClick={() => void handleGenerate()}>
-            <Sparkles className="mr-2 h-4 w-4" />
-            生成话术
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={generating}
+            onClick={() => void handleGenerate()}
+          >
+            {generating ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="mr-2 h-4 w-4" />
+            )}
+            {generating ? "生成中..." : "生成话术"}
           </Button>
         </div>
       </div>
     );
   }
 
-  // 生成中
-  if (generating) {
-    return (
-      <div className="rounded-md border bg-muted/30 p-4">
-        <div className="flex items-center justify-center gap-3 py-6">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">AI 正在生成话术...</span>
-        </div>
-      </div>
-    );
-  }
-
   // 有草稿结果
-  const sceneLabel = SCENE_LABELS[selectedScene] || selectedScene;
-
   return (
     <div className="rounded-md border bg-muted/30 p-3">
+      {/* 生成中提示：不替换内容，只在顶部显示进度条 */}
+      {generating && (
+        <div className="mb-3 flex items-center justify-center gap-2 rounded bg-amber-50 py-1.5 text-xs text-amber-700">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          重新生成中...
+        </div>
+      )}
+
       {/* 顶部：场景标签 + 操作按钮 */}
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -129,7 +134,8 @@ export function AIDraftPanel({
           <select
             value={selectedScene}
             onChange={(e) => handleSceneChange(e.target.value)}
-            className="h-7 rounded border bg-transparent px-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+            disabled={generating}
+            className="h-7 rounded border bg-transparent px-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50"
           >
             {SCENES.map((s) => (
               <option key={s} value={s}>
@@ -146,7 +152,11 @@ export function AIDraftPanel({
             onClick={handleRegenerate}
             disabled={generating}
           >
-            <RefreshCw className="mr-1 h-3 w-3" />
+            {generating ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1 h-3 w-3" />
+            )}
             重新生成
           </Button>
           <Button
