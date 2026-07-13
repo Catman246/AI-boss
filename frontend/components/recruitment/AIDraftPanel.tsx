@@ -29,6 +29,8 @@ interface AIDraftPanelProps {
   draft: ChatDraftResult | null;
   /** 生成中的 loading 状态 */
   generating: boolean;
+  /** 开始生成时回调 — 父组件设置 loading 状态 */
+  onGenerateStart: () => void;
   /** 当新的 draft 生成时回调 */
   onDraftGenerated: (result: ChatDraftResult) => void;
 }
@@ -41,11 +43,13 @@ export function AIDraftPanel({
   currentRole,
   draft,
   generating,
+  onGenerateStart,
   onDraftGenerated,
 }: AIDraftPanelProps) {
   const [selectedScene, setSelectedScene] = useState<string>(draft?.scene || "greeting");
 
   const handleGenerate = async (scene?: string) => {
+    onGenerateStart();
     const messages: ChatMessage[] = lastMessage
       ? [{ role: "candidate" as const, content: lastMessage }]
       : [];
@@ -107,7 +111,7 @@ export function AIDraftPanel({
   }
 
   // 有草稿结果
-  const sceneLabel = SCENE_LABELS[draft!.scene] || draft!.scene;
+  const sceneLabel = SCENE_LABELS[selectedScene] || selectedScene;
 
   return (
     <div className="rounded-md border bg-muted/30 p-3">

@@ -1603,6 +1603,7 @@ export default function RecruitmentPage({ embedded = false }: { embedded?: boole
                           currentRole={candidate.current_role}
                           draft={chatDrafts[candidate.id] || null}
                           generating={generatingChatDraftId === candidate.id}
+                          onGenerateStart={() => setGeneratingChatDraftId(candidate.id)}
                           onDraftGenerated={(result) => handleChatDraftGenerated(candidate.id, result)}
                         />
                       </div>
