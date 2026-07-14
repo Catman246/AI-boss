@@ -793,7 +793,7 @@ func (s *RecruitmentService) GenerateChatDraft(ctx context.Context, userID uint,
 		return s.chatDraftFallback(req, candidate), nil
 	}
 
-	llmResponse, err := provider.GenerateResponse([]MessageHistory{}, systemPrompt, "", "")
+	llmResponse, err := provider.GenerateResponse([]MessageHistory{{Role: "system", Content: systemPrompt}}, "请根据以上信息生成回复草稿", "", "")
 	if err != nil {
 		log.Printf("[chat-draft] LLM call failed: %v", err)
 		return s.chatDraftFallback(req, candidate), nil
@@ -887,6 +887,13 @@ func buildChatDraftSystemPrompt(req *models.RecruitmentRequirement, candidate *m
 	b.WriteString("2. 禁止直接索要候选人的身份证号、银行卡号、家庭住址等个人隐私信息；\n")
 	b.WriteString("3. 发起任何沟通或邀约前，必须先确认候选人的意愿，不得强行推进；\n")
 	b.WriteString("4. 你生成的所有内容均为草稿，默认需要人工审核后才能发送给候选人，因此回复中不要出现「已发送」「请查收」等暗示消息已发出的表述。\n\n")
+
+	// Common scenario handling rules
+	b.WriteString("## 常见场景处理指引\n")
+	b.WriteString("- 候选人说「没经验」「没做过」→ 追问学习意愿（「愿意学吗？」）或相近经历（「做过类似的活吗？」），不要直接放弃或长篇鼓励；\n")
+	b.WriteString("- 候选人问「工资多少」「多少钱一个月」→ 结合招聘需求中的岗位信息给出范围说明（如「普工 5000~6000」「计件多劳多得」），只描述不承诺，不能说「保证你能拿多少」；\n")
+	b.WriteString("- 候选人问「在哪里」「远不远」→ 直接给出地点，问一句「方便过来吗？」即可，不要展开介绍公司；\n")
+	b.WriteString("- 候选人已读不回超过一轮 → 简单追问一句「还在找工作吗？」即可，不要连续发多条。\n\n")
 
 	// Scene constraint
 	sceneLabel := sceneLabelText(scene)

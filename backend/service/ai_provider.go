@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -88,7 +89,10 @@ func NewUniversalAIProvider(config AIConfig) *UniversalAIProvider {
 	return &UniversalAIProvider{
 		config: config,
 		client: &http.Client{
-			Timeout: 60 * time.Second, // 60 秒超时
+			Timeout: 180 * time.Second, // 180 秒超时（推理模型需较长思考时间，实测 ~50s）
+			Transport: &http.Transport{
+				Proxy: func(*http.Request) (*url.URL, error) { return nil, nil },
+			},
 		},
 		adapter: adapter,
 	}
@@ -151,8 +155,9 @@ func (p *UniversalAIProvider) generateTextResponse(conversationHistory []Message
 		}
 	} else {
 		requestBody = map[string]interface{}{
-			"model":    p.config.Model,
-			"messages": messages,
+			"model":      p.config.Model,
+			"messages":   messages,
+			"max_tokens": 4096,
 		}
 	}
 
@@ -249,8 +254,9 @@ func (p *UniversalAIProvider) GenerateResponseWithTools(messages []map[string]in
 		}
 	} else {
 		requestBody = map[string]interface{}{
-			"model":    p.config.Model,
-			"messages": messages,
+			"model":      p.config.Model,
+			"messages":   messages,
+			"max_tokens": 4096,
 		}
 		if len(tools) > 0 {
 			requestBody["tools"] = tools
