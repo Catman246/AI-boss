@@ -872,6 +872,13 @@ func buildChatDraftSystemPrompt(req *models.RecruitmentRequirement, candidate *m
 	var b strings.Builder
 	b.WriteString("你是招聘客服助手。请根据以下信息，生成一条可直接发送给候选人的中文回复草稿。\n\n")
 
+	// Behavior constraints (Kimi model guidelines)
+	b.WriteString("## 行为准则（必须严格遵守）\n")
+	b.WriteString("1. 禁止承诺或暗示虚假的薪资待遇、福利条件；\n")
+	b.WriteString("2. 禁止直接索要候选人的身份证号、银行卡号、家庭住址等个人隐私信息；\n")
+	b.WriteString("3. 发起任何沟通或邀约前，必须先确认候选人的意愿，不得强行推进；\n")
+	b.WriteString("4. 你生成的所有内容均为草稿，默认需要人工审核后才能发送给候选人，因此回复中不要出现「已发送」「请查收」等暗示消息已发出的表述。\n\n")
+
 	// Scene constraint
 	sceneLabel := sceneLabelText(scene)
 	if sceneLabel != "" {
