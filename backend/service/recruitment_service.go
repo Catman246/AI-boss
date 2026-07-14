@@ -870,7 +870,16 @@ func formatRAGResults(results []rag.SearchResult) string {
 // buildChatDraftSystemPrompt builds the recruitment-specific LLM prompt.
 func buildChatDraftSystemPrompt(req *models.RecruitmentRequirement, candidate *models.RecruitmentCandidate, ragContext string, scene string, messages []ChatMessage) string {
 	var b strings.Builder
-	b.WriteString("你是招聘客服助手。请根据以下信息，生成一条可直接发送给候选人的中文回复草稿。\n\n")
+	b.WriteString("你是蓝领招聘客服助手，沟通对象多为学历不高的求职者（初中及以下）。请根据以下信息，生成一条可直接发送给候选人的中文回复草稿。\n\n")
+
+	// Communication style — optimized for blue-collar recruitment
+	b.WriteString("## 沟通风格（请遵守）\n")
+	b.WriteString("1. 口语化、像微信聊天，不要书面语，不要用「您」「先生/女士」等过度尊称，直接用「你」；\n")
+	b.WriteString("2. 开头直奔主题，禁止铺垫（如「了解到你之前做过XX」「这可能为你积累了经验」）；\n")
+	b.WriteString("3. 短句优先，每句话不超过 15~20 字，整条回复控制在 2~3 句话、60~120 字左右；\n")
+	b.WriteString("4. 一次只说一件事，不要一口气问多个问题（追问建议单独放在 follow_up_questions 里）；\n")
+	b.WriteString("5. 用简单词汇，避免「适配度」「相关经验积累」「进一步沟通」等书面表达，改成「合适」「做过类似的」「聊聊」；\n")
+	b.WriteString("6. 不要重复候选人已知信息（如候选人说了自己的经历，不要再复述一遍）。\n\n")
 
 	// Behavior constraints (Kimi model guidelines)
 	b.WriteString("## 行为准则（必须严格遵守）\n")
@@ -940,7 +949,7 @@ func buildChatDraftSystemPrompt(req *models.RecruitmentRequirement, candidate *m
 	// Output format instruction
 	b.WriteString("\n## 输出要求\n")
 	b.WriteString("请以JSON格式输出，包含以下字段:\n")
-	b.WriteString("- draft: 可直接发送的中文回复草稿（自然、简短、像真人招聘沟通；不要使用Markdown）\n")
+	b.WriteString("- draft: 可直接发送的中文回复草稿。要求：口语化短句、无客套铺垫、2~3句话、总字数 60~120 字、像真人微信聊天；禁止使用 Markdown\n")
 	b.WriteString("- follow_up_questions: 建议的1-3个后续追问（用于推进了解岗位意向、工期、经验、地区等）\n")
 	b.WriteString("- scene: 场景分类，从以下选择: greeting(初次打招呼), follow_up(跟进), interview_invite(邀约面试), info_request(索要信息), objection_handling(异议处理), closing(收尾/加微信)\n\n")
 	b.WriteString("只输出JSON，不要包含其他内容。\n")
