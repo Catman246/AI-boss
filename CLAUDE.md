@@ -533,6 +533,24 @@ docker-compose exec backend sh            # 进入后端容器
 - 前端聊天页面（`/agent/chat/[id]`）尚未接入 AI 话术
 - RAG 嵌入模型未配置（`/health` 503）
 
+### 2026-07-14（Yiming — 话术 prompt 优化 & LLM 调用修复）
+
+**Prompt 优化：**
+- 角色定位细化：蓝领招聘客服助手，面向低学历求职者
+- 新增「沟通风格」6 条：口语化、短句 ≤20 字、整条 60~120 字、禁客套铺垫、简单词汇、不复述已知信息
+- 新增「行为准则」4 条：禁虚假薪资、禁索隐私、先确认意愿、默认草稿需人工审核
+- 新增「常见场景处理指引」4 类：没经验→追问学习意愿、问工资→给范围不承诺、问地点→直接报+问是否方便、已读不回→简单追问
+- 验收标准实测通过：「我没经验」→ 106 字口语化安抚、「工资多少」→ 70 字确认基础条件
+
+**LLM 调用修复（根因：Go HTTP 客户端被 Windows 系统代理阻塞 + 推理模型超时）：**
+- 系统 prompt 从 `role: "user"` 改为 `role: "system"` 传入（关键修复 — kimi-k2.6 推理模型对 system 消息的思考远快于 user 消息，耗时从 >120s 降至 ~50s）
+- `ai_provider.go` HTTP 客户端超时 60s → 180s（推理模型实测 ~50s）
+- 显式禁用 HTTP Transport 代理探测（`Proxy: nil`），防止走不通的本地代理
+- `generateTextResponse` + `GenerateResponseWithTools` 添加 `max_tokens: 4096`，防止推理 tokens 耗尽输出空间导致 content 为空
+
+**新发现的环境问题：**
+- Windows 系统代理 `127.0.0.1:7897` 虽设为关闭，Go 的 `http.Transport` 仍会探测并路由流量通过代理，导致 API 调用超时。已通过显式禁用代理修复。
+
 <!-- superpowers-zh:begin (do not edit between these markers) -->
 # Superpowers-ZH 中文增强版
 
