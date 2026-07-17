@@ -1,0 +1,8 @@
+fastapi>=0.115
+uvicorn>=0.30
+DrissionPage==4.1.1.4
+lxml>=5
+openai>=1.0
+fastembed==0.8.0
+lancedb==0.34.0
+pywebview==6.2.1

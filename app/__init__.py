@@ -1,0 +1,1 @@
+"""Local BOSS chat application."""

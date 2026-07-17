@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>招聘协同台</title>
+    <link rel="stylesheet" href="/static/app.css?v=2026071705">
+  </head>
+  <body>
+    <main id="login-view" class="login-shell">
+      <section class="login-brand" aria-label="系统名称">
+        <div class="brand-mark" aria-hidden="true">聘</div>
+        <p class="kicker">RECRUITING OPERATIONS</p>
+        <h1>招聘协同台</h1>
+        <p>一个候选人档案，贯穿 BOSS 初聊、私域跟进和面试确认。</p>
+        <div class="login-flow" aria-hidden="true">
+          <span>BOSS 获客</span><i></i><span>微信跟进</span><i></i><span>面试确认</span>
+        </div>
+      </section>
+      <section class="login-panel" aria-labelledby="login-title">
+        <p class="section-label">本机工作台</p>
+        <h2 id="login-title">登录</h2>
+        <form id="login-form">
+          <label for="username">用户名</label>
+          <input id="username" name="username" value="admin" autocomplete="username" required>
+          <label for="password">密码</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <p id="login-error" class="form-error" role="alert"></p>
+          <button type="submit" class="primary-button">进入工作台</button>
+        </form>
+        <p class="login-note">密钥、候选人资料和知识索引保存在本机。</p>
+      </section>
+    </main>
+
+    <div id="app-view" class="app-shell hidden">
+      <aside class="nav-rail" aria-label="主导航">
+        <div class="rail-logo" title="招聘协同台">聘</div>
+        <div class="rail-rule"></div>
+        <button id="conversation-button" class="rail-button active" type="button" title="会话" aria-label="会话">
+          <svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+          <span class="rail-label">会话</span>
+        </button>
+        <button id="task-button" class="rail-button badge-host" type="button" title="交接任务" aria-label="交接任务">
+          <svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
+          <span class="rail-label">交接任务</span><span id="task-badge" class="rail-badge hidden">0</span>
+        </button>
+        <button id="greeting-button" class="rail-button badge-host" type="button" title="主动招呼" aria-label="主动招呼">
+          <svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21a8 8 0 0 1 13.3-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/></svg>
+          <span class="rail-label">主动招呼</span><span id="greeting-badge" class="rail-badge hidden">停</span>
+        </button>
+        <button id="knowledge-button" class="rail-button" type="button" title="知识库" aria-label="知识库">
+          <svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span class="rail-label">知识库</span>
+        </button>
+        <button id="model-button" class="rail-button" type="button" title="AI 模型" aria-label="AI 模型">
+          <svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/><circle cx="12" cy="12" r="4"/></svg>
+          <span class="rail-label">AI 模型</span>
+        </button>
+        <div class="rail-spacer"></div>
+        <div class="rail-connection" title="BOSS 连接状态"><span id="rail-status" class="rail-status offline"></span><span>BOSS 连接</span></div>
+        <button id="logout-button" class="rail-button" type="button" title="退出登录" aria-label="退出登录">
+          <svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg>
+          <span class="rail-label">退出登录</span>
+        </button>
+      </aside>
+
+      <section class="contacts-pane" aria-labelledby="contacts-title">
+        <header class="contacts-header">
+          <div>
+            <p class="section-label">候选人收件箱</p>
+            <h2 id="contacts-title">沟通队列</h2>
+          </div>
+          <button id="refresh-button" class="icon-button" type="button" title="刷新" aria-label="刷新">↻</button>
+        </header>
+        <div class="agent-switch" role="tablist" aria-label="招聘 Agent">
+          <button id="agent-boss" class="agent-tab active" type="button" role="tab" aria-selected="true"><span class="agent-dot boss"></span>BOSS 获客</button>
+          <button id="agent-wechat" class="agent-tab" type="button" role="tab" aria-selected="false"><span class="agent-dot wechat"></span>微信跟进</button>
+        </div>
+        <div class="inbox-tools">
+          <label class="search-wrap">
+            <span aria-hidden="true">⌕</span>
+            <input id="contact-search" type="search" placeholder="搜索姓名或岗位" aria-label="搜索候选人">
+          </label>
+          <button id="new-candidate-button" class="icon-button" type="button" title="新建微信候选人" aria-label="新建微信候选人">＋</button>
+        </div>
+        <div class="queue-meta"><span id="channel-caption">来自 BOSS 的实时会话</span><span id="contact-count" class="count-label">0 位</span></div>
+        <div id="contact-list" class="contact-list" aria-live="polite"></div>
+      </section>
+
+      <main class="conversation-pane">
+        <div id="status-banner" class="status-banner hidden" role="status"></div>
+        <section id="empty-conversation" class="empty-conversation">
+          <div class="empty-route" aria-hidden="true"><b>候</b><i></i><b>聊</b><i></i><b>面</b></div>
+          <p class="section-label">招聘协同工作流</p>
+          <h2>选择候选人开始处理</h2>
+          <p>会话、知识依据、私域身份和面试任务会汇总到同一份候选人档案。</p>
+        </section>
+
+        <section id="conversation-view" class="conversation-view hidden" aria-label="当前会话">
+          <header class="conversation-header">
+            <div id="active-avatar" class="active-avatar" aria-hidden="true"></div>
+            <div class="conversation-title">
+              <div class="title-row"><h2 id="active-name">未选择</h2><span id="active-stage" class="stage-chip">新线索</span></div>
+              <p id="active-job">职位信息</p>
+            </div>
+            <div class="conversation-meta">
+              <span id="semantic-chip" class="system-chip">语义检索</span>
+              <span id="ai-chip" class="system-chip">AI 未配置</span>
+              <span id="connection-chip" class="system-chip offline">BOSS 未连接</span>
+            </div>
+          </header>
+          <div id="message-list" class="message-list" aria-live="polite"></div>
+          <footer class="composer">
+            <section id="ai-draft-panel" class="ai-draft hidden" aria-labelledby="ai-draft-title">
+              <div class="ai-draft-head">
+                <div><p id="ai-draft-title" class="ai-draft-label">AI 草稿 · 发送前请审核</p><span id="ai-draft-status" class="ai-draft-status"></span></div>
+                <button id="ignore-draft" class="quiet-icon-button" type="button" title="忽略草稿" aria-label="忽略草稿">×</button>
+              </div>
+              <p id="ai-draft-text" class="ai-draft-text"></p>
+              <p id="ai-draft-sources" class="ai-draft-sources"></p>
+              <div class="ai-draft-actions">
+                <button id="regenerate-draft" class="secondary-button" type="button">重新生成</button>
+                <button id="adopt-draft" class="primary-small-button" type="button">采用草稿</button>
+              </div>
+            </section>
+            <div class="composer-labels">
+              <span>发送给 <strong id="composer-recipient">候选人</strong></span>
+              <div id="message-mode" class="message-mode hidden">
+                <button id="mode-reply" class="active" type="button">回复</button>
+                <button id="mode-incoming" type="button">录入对方消息</button>
+              </div>
+              <span>Enter 发送 · Shift+Enter 换行</span>
+            </div>
+            <textarea id="message-input" rows="3" maxlength="2000" placeholder="输入回复，发送前请确认内容"></textarea>
+            <div class="composer-actions"><span id="send-feedback" role="status"></span><button id="send-button" class="send-button" type="button">发送</button></div>
+          </footer>
+        </section>
+      </main>
+
+      <aside id="candidate-context" class="context-pane" aria-label="候选人档案">
+        <header class="context-header"><div><p class="section-label">共享候选人档案</p><h2>招聘进度</h2></div><span id="candidate-id" class="record-id">未选择</span></header>
+        <div id="context-empty" class="context-empty">选择会话后查看并维护候选人资料。</div>
+        <div id="context-content" class="context-content hidden">
+          <form id="candidate-form" class="context-form">
+            <label for="candidate-stage">当前阶段</label>
+            <select id="candidate-stage">
+              <option value="new">新线索</option><option value="contacted">已沟通</option><option value="private">已进私域</option><option value="interview">待面试</option><option value="hired">已录用</option><option value="closed">已结束</option>
+            </select>
+            <div class="two-fields"><div><label for="candidate-name">姓名</label><input id="candidate-name" required></div><div><label for="candidate-job">应聘岗位</label><input id="candidate-job"></div></div>
+            <label for="wechat-id">微信标识</label><input id="wechat-id" placeholder="微信号或备注名">
+            <label for="private-contact">联系方式</label><input id="private-contact" placeholder="手机号 / 微信号">
+            <label for="candidate-tags">标签</label><input id="candidate-tags" placeholder="有经验, 可立即到岗">
+            <label for="candidate-notes">内部备注</label><textarea id="candidate-notes" rows="3" placeholder="仅招聘团队可见"></textarea>
+            <button class="secondary-button full-button" type="submit">保存档案</button>
+          </form>
+          <section class="handoff-section">
+            <div class="section-heading"><div><p class="section-label">微信 Agent → BOSS Agent</p><h3>确认面试</h3></div><span>人工审核</span></div>
+            <form id="interview-form">
+              <label for="interview-time">面试时间</label><input id="interview-time" placeholder="2026-07-18 14:30" required>
+              <label for="interview-location">面试地点</label><input id="interview-location" placeholder="填写确定后的地点" required>
+              <button class="handoff-button" type="submit">生成 BOSS 确认任务</button>
+            </form>
+          </section>
+        </div>
+      </aside>
+    </div>
+
+    <div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
+    <aside id="task-drawer" class="side-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="task-heading">
+      <header class="drawer-header"><div><p class="section-label">跨 Agent 交接</p><h2 id="task-heading">待审核任务</h2></div><button id="task-close" class="quiet-icon-button" type="button" aria-label="关闭">×</button></header>
+      <div id="task-list" class="drawer-list"></div>
+    </aside>
+
+    <aside id="greeting-drawer" class="side-drawer greeting-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="greeting-heading">
+      <header class="drawer-header"><div><p class="section-label">推荐牛人</p><h2 id="greeting-heading">主动招呼计划</h2></div><div class="drawer-header-actions"><button id="greeting-new-plan" class="secondary-button compact-button" type="button">新建计划</button><button id="greeting-close" class="quiet-icon-button" type="button" aria-label="关闭">×</button></div></header>
+      <section class="greeting-summary">
+        <div><strong id="greeting-today">0</strong><span>今日已招呼</span></div>
+        <div><strong id="greeting-hour">0</strong><span>本小时</span></div>
+        <div><strong id="greeting-next">无计划</strong><span>下次执行</span></div>
+      </section>
+      <div class="greeting-scroll">
+        <div class="drawer-list-head"><strong>计划列表</strong><span id="greeting-plan-count">0 个</span></div>
+        <div id="greeting-plan-list" class="greeting-plan-list" aria-live="polite"></div>
+        <form id="greeting-form" class="greeting-form hidden">
+          <input id="greeting-plan-id" type="hidden">
+          <div class="greeting-form-title"><strong id="greeting-form-heading">新建计划</strong></div>
+          <label for="greeting-plan-name">计划名称</label><input id="greeting-plan-name" maxlength="40" required>
+          <label class="setting-toggle" for="greeting-enabled"><span><strong>启用此计划</strong></span><input id="greeting-enabled" type="checkbox"></label>
+          <div class="setting-grid">
+            <label for="greeting-daily-limit">每日上限</label><input id="greeting-daily-limit" type="number" min="1" max="200" value="30" required>
+            <label for="greeting-hourly-limit">每小时上限</label><input id="greeting-hourly-limit" type="number" min="1" max="5" value="4" required>
+            <label for="greeting-start-at">开始时间</label><input id="greeting-start-at" class="datetime-setting" type="datetime-local" step="60" required>
+            <label for="greeting-end-at">结束时间</label><input id="greeting-end-at" class="datetime-setting" type="datetime-local" step="60" required>
+          </div>
+          <p id="greeting-warning" class="greeting-warning" role="alert"></p>
+          <div class="greeting-actions"><button id="greeting-plan-cancel" class="secondary-button" type="button">取消</button><button class="primary-small-button" type="submit">保存计划</button></div>
+        </form>
+        <div class="drawer-list-head"><strong>执行记录</strong><span id="greeting-log-count">0 条</span></div>
+        <div id="greeting-log-list" class="greeting-log-list"></div>
+      </div>
+    </aside>
+
+    <aside id="knowledge-drawer" class="side-drawer knowledge-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="knowledge-heading">
+      <header class="drawer-header"><div><p class="section-label">LanceDB · FastEmbed · BGE</p><h2 id="knowledge-heading">招聘知识库</h2></div><button id="knowledge-close" class="quiet-icon-button" type="button" aria-label="关闭">×</button></header>
+      <form id="knowledge-form" class="knowledge-form">
+        <input id="knowledge-id" type="hidden">
+        <label for="knowledge-title">标题</label><input id="knowledge-title" maxlength="120" required>
+        <label for="knowledge-keywords">常见说法</label><input id="knowledge-keywords" maxlength="1000" placeholder="工资多少；一天多少钱">
+        <label for="knowledge-content">已确认知识</label><textarea id="knowledge-content" rows="6" maxlength="20000" required></textarea>
+        <div class="knowledge-form-actions"><label class="switch-label"><input id="knowledge-enabled" type="checkbox" checked>参与检索</label><span></span><button id="knowledge-cancel" class="secondary-button hidden" type="button">取消</button><button class="primary-small-button" type="submit">保存知识</button></div>
+        <p id="knowledge-feedback" class="form-error" role="alert"></p>
+      </form>
+      <div class="drawer-list-head"><strong>知识条目</strong><span id="knowledge-count">0 条</span></div>
+      <div id="knowledge-list" class="drawer-list"></div>
+    </aside>
+
+    <aside id="model-drawer" class="side-drawer model-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="model-heading">
+      <header class="drawer-header"><div><p class="section-label">本机 AI 服务</p><h2 id="model-heading">AI 模型设置</h2></div><button id="model-close" class="quiet-icon-button" type="button" aria-label="关闭">×</button></header>
+      <form id="model-form" class="model-form">
+        <p class="model-intro">接入 OpenAI 兼容接口。配置只保存在当前电脑，API Key 不会在页面中回显。</p>
+        <label for="model-provider">服务商名称</label>
+        <input id="model-provider" maxlength="50" placeholder="例如：DeepSeek、通义千问、自建模型" required>
+        <label for="model-base-url">Base URL</label>
+        <input id="model-base-url" type="url" maxlength="500" placeholder="https://api.example.com/v1" required>
+        <label for="model-api-key">API Key</label>
+        <input id="model-api-key" type="password" maxlength="4000" autocomplete="new-password" placeholder="输入 API Key">
+        <small id="model-key-note" class="model-help">尚未保存 API Key</small>
+        <label for="model-name">模型名</label>
+        <input id="model-name" maxlength="120" placeholder="服务商提供的模型标识" required>
+        <p id="model-current" class="model-current">尚未配置</p>
+        <p id="model-feedback" class="model-feedback" role="status"></p>
+        <div class="model-actions"><button id="model-test" class="secondary-button" type="button">测试连接</button><button class="primary-small-button" type="submit">保存配置</button></div>
+      </form>
+    </aside>
+
+    <dialog id="candidate-dialog" class="candidate-dialog">
+      <form id="new-candidate-form" method="dialog">
+        <header><div><p class="section-label">微信跟进</p><h2>新建候选人</h2></div><button id="candidate-dialog-close" class="quiet-icon-button" type="button" aria-label="关闭">×</button></header>
+        <label for="new-name">姓名</label><input id="new-name" required>
+        <label for="new-job">应聘岗位</label><input id="new-job">
+        <label for="new-wechat">微信标识</label><input id="new-wechat" required>
+        <p id="new-candidate-feedback" class="form-error"></p>
+        <button class="primary-button" type="submit">创建并打开会话</button>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast hidden" role="status"></div>
+    <script src="/static/app.js?v=2026071705" defer></script>
+  </body>
+</html>
