@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -8,6 +9,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).parents[1]
 ARTIFACTS = ROOT / "artifacts"
+BASE_URL = os.getenv("UI_BASE_URL", "http://127.0.0.1:8765")
 
 
 def main() -> None:
@@ -23,7 +25,19 @@ def main() -> None:
             if url.endswith("/api/status"):
                 route.fulfill(json={"connected": True, "logged_in": True, "message": "已连接"})
             elif url.endswith("/api/ai/status"):
-                route.fulfill(json={"configured": True, "model": "kimi-k2.6"})
+                route.fulfill(json={"configured": True, "provider": "自定义模型", "model": "chat-model"})
+            elif url.endswith("/api/ai/config/test"):
+                route.fulfill(json={"ok": True, "provider": "自定义模型", "model": "chat-model"})
+            elif url.endswith("/api/ai/config"):
+                route.fulfill(
+                    json={
+                        "provider": "自定义模型",
+                        "base_url": "https://api.example.com/v1",
+                        "model": "chat-model",
+                        "configured": True,
+                        "has_api_key": True,
+                    }
+                )
             elif url.endswith("/api/knowledge/status"):
                 route.fulfill(json={"ready": True})
             elif url.endswith("/api/knowledge") and request.method == "GET":
@@ -81,10 +95,11 @@ def main() -> None:
 
         page.route("**/api/status", route_api)
         page.route("**/api/ai/status", route_api)
+        page.route("**/api/ai/config**", route_api)
         page.route("**/api/knowledge**", route_api)
         page.route("**/api/candidates**", route_api)
         page.route("**/api/contacts**", route_api)
-        page.goto("http://127.0.0.1:8765", wait_until="networkidle")
+        page.goto(BASE_URL, wait_until="networkidle")
         page.screenshot(path=ARTIFACTS / "ai-login.png", full_page=True)
         page.locator("#username").fill("admin")
         page.locator("#password").fill("123456")
@@ -102,7 +117,13 @@ def main() -> None:
         page.wait_for_timeout(250)
         page.screenshot(path=ARTIFACTS / "knowledge-drawer.png", full_page=True)
         count = page.locator("#knowledge-count").inner_text()
-        print(json.dumps({"draft_adopted": True, "sent": 0, "knowledge": count}, ensure_ascii=True))
+        page.locator("#knowledge-close").click()
+        page.locator("#model-button").click()
+        page.locator("#model-drawer:not(.hidden)").wait_for()
+        page.wait_for_timeout(250)
+        page.screenshot(path=ARTIFACTS / "model-settings.png", full_page=True)
+        assert page.locator("#model-api-key").input_value() == ""
+        print(json.dumps({"draft_adopted": True, "sent": 0, "knowledge": count, "model_key_masked": True}, ensure_ascii=True))
         browser.close()
 
 

@@ -32,9 +32,10 @@ def choose_model(model_ids: list[str]) -> str:
 
 def write_env(path: Path, key: str, model: str) -> None:
     content = (
-        f"MOONSHOT_API_KEY={key}\n"
-        "KIMI_BASE_URL=https://api.moonshot.cn/v1\n"
-        f"KIMI_MODEL={model}\n"
+        "AI_PROVIDER=Kimi\n"
+        "AI_BASE_URL=https://api.moonshot.cn/v1\n"
+        f"AI_API_KEY={key}\n"
+        f"AI_MODEL={model}\n"
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f"{path.name}.tmp")

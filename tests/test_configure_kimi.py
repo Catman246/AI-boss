@@ -26,9 +26,10 @@ class ConfigureKimiTests(unittest.TestCase):
             write_env(target, "sk-secret", "kimi-k2.6")
             self.assertEqual(
                 target.read_text(encoding="utf-8"),
-                "MOONSHOT_API_KEY=sk-secret\n"
-                "KIMI_BASE_URL=https://api.moonshot.cn/v1\n"
-                "KIMI_MODEL=kimi-k2.6\n",
+                "AI_PROVIDER=Kimi\n"
+                "AI_BASE_URL=https://api.moonshot.cn/v1\n"
+                "AI_API_KEY=sk-secret\n"
+                "AI_MODEL=kimi-k2.6\n",
             )
 
 

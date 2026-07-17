@@ -97,6 +97,13 @@ class KnowledgeUpdate(BaseModel):
     enabled: bool | None = None
 
 
+class AIConfigRequest(BaseModel):
+    provider: str
+    base_url: str
+    api_key: str = ""
+    model: str
+
+
 def create_app(
     boss: Any | None = None,
     knowledge: Any | None = None,
@@ -128,7 +135,8 @@ def create_app(
                 knowledge.seed_markdown(seed)
         knowledge.reindex()
     if drafts is None:
-        drafts = DraftService(knowledge)
+        config_path = PROJECT_DIR / ".env" if data_dir is None else runtime_data / "ai.env"
+        drafts = DraftService(knowledge, config_path=config_path)
     if recruiting is None:
         recruiting = RecruitingStore(runtime_data / "recruiting.db")
     if greetings is None:
@@ -211,6 +219,30 @@ def create_app(
     @app.get("/api/ai/status", dependencies=[Depends(require_session)])
     def ai_status() -> dict[str, Any]:
         return app.state.drafts.status()
+
+    @app.get("/api/ai/config", dependencies=[Depends(require_session)])
+    def ai_config() -> dict[str, Any]:
+        return app.state.drafts.config()
+
+    @app.put("/api/ai/config", dependencies=[Depends(require_session)])
+    def save_ai_config(payload: AIConfigRequest) -> dict[str, Any]:
+        try:
+            return app.state.drafts.save_config(
+                payload.provider, payload.base_url, payload.api_key, payload.model
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post("/api/ai/config/test", dependencies=[Depends(require_session)])
+    def test_ai_config(payload: AIConfigRequest) -> dict[str, Any]:
+        try:
+            return app.state.drafts.test_config(
+                payload.provider, payload.base_url, payload.api_key, payload.model
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"连接测试失败：{exc}") from exc
 
     @app.get("/api/contacts", dependencies=[Depends(require_session)])
     def contacts(passive: bool = True) -> list[dict[str, Any]]:

@@ -3,13 +3,16 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlsplit, urlunsplit
 
 from .knowledge import KnowledgeStore
 
 
 PROJECT_DIR = Path(__file__).parents[1]
+AI_ENV_KEYS = ("AI_PROVIDER", "AI_BASE_URL", "AI_API_KEY", "AI_MODEL")
 BANNED_PHRASES = (
     "根据您提供的信息",
     "非常感谢您的咨询",
@@ -20,15 +23,51 @@ BANNED_PHRASES = (
 )
 
 
-def load_env(path: Path = PROJECT_DIR / ".env") -> None:
+def read_env(path: Path) -> dict[str, str]:
     if not path.exists():
-        return
+        return {}
+    values = {}
     for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         name, value = line.split("=", 1)
-        os.environ.setdefault(name.strip(), value.strip())
+        values[name.strip()] = value.strip()
+    return values
+
+
+def load_env(path: Path = PROJECT_DIR / ".env") -> None:
+    for name, value in read_env(path).items():
+        os.environ.setdefault(name, value)
+
+
+def write_env(path: Path, updates: Mapping[str, str]) -> None:
+    lines = path.read_text(encoding="utf-8-sig").splitlines() if path.exists() else []
+    written = set()
+    for index, raw_line in enumerate(lines):
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name = line.split("=", 1)[0].strip()
+        if name in updates:
+            lines[index] = f"{name}={updates[name]}"
+            written.add(name)
+    lines.extend(f"{name}={updates[name]}" for name in AI_ENV_KEYS if name not in written)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f"{path.name}.tmp")
+    temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def normalize_base_url(value: str) -> str:
+    value = value.strip().rstrip("/")
+    parts = urlsplit(value)
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        raise ValueError("Base URL 必须是有效的 http 或 https 地址")
+    path = parts.path.rstrip("/")
+    if path.endswith("/chat/completions"):
+        path = path[: -len("/chat/completions")]
+    return urlunsplit((parts.scheme, parts.netloc, path, parts.query, ""))
 
 
 def message_fingerprint(contact_key: str, message: dict[str, Any]) -> str:
@@ -111,39 +150,144 @@ class DraftService:
         self,
         store: KnowledgeStore,
         complete: Callable[[list[dict[str, str]]], str] | None = None,
+        config_path: Path | None = None,
+        environ: Mapping[str, str] | None = None,
     ):
-        load_env()
+        self.config_path = Path(config_path or PROJECT_DIR / ".env")
+        if environ is None:
+            load_env(self.config_path)
+            environ = os.environ
+        self.environ = environ
         self.store = store
-        self.model = os.getenv("KIMI_MODEL", "kimi-k2.6")
-        self.base_url = os.getenv("KIMI_BASE_URL", "https://api.moonshot.cn/v1")
-        self.api_key = os.getenv("MOONSHOT_API_KEY", "")
-        self._complete = complete or self._kimi_complete
+        self._complete = complete or self._provider_complete
         self._client = None
+        self._client_signature: tuple[str, str] | None = None
         self._cache: dict[str, dict[str, Any]] = {}
 
     def status(self) -> dict[str, Any]:
-        return {"configured": bool(self.api_key), "model": self.model if self.api_key else ""}
-
-    def _kimi_complete(self, messages: list[dict[str, str]]) -> str:
-        if not self.api_key:
-            raise RuntimeError("Kimi 尚未配置")
-        if self._client is None:
-            from openai import OpenAI
-
-            self._client = OpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url,
-                timeout=30.0,
-                max_retries=0,
-            )
-        request: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "max_tokens": 120,
+        config = self.config()
+        return {
+            "configured": config["configured"],
+            "model": config["model"] if config["configured"] else "",
+            "provider": config["provider"],
         }
-        if self.model in {"kimi-k2.6", "kimi-k2.5"}:
+
+    def _config(self) -> dict[str, str]:
+        values = dict(self.environ)
+        values.update(read_env(self.config_path))
+        legacy = any(values.get(name) for name in ("MOONSHOT_API_KEY", "KIMI_BASE_URL", "KIMI_MODEL"))
+        return {
+            "provider": values.get("AI_PROVIDER", "Kimi" if legacy else "").strip(),
+            "base_url": values.get("AI_BASE_URL", values.get("KIMI_BASE_URL", "")).strip(),
+            "api_key": values.get("AI_API_KEY", values.get("MOONSHOT_API_KEY", "")).strip(),
+            "model": values.get("AI_MODEL", values.get("KIMI_MODEL", "")).strip(),
+        }
+
+    @staticmethod
+    def _validated_config(provider: str, base_url: str, api_key: str, model: str) -> dict[str, str]:
+        config = {
+            "provider": provider.strip(),
+            "base_url": normalize_base_url(base_url),
+            "api_key": api_key.strip(),
+            "model": model.strip(),
+        }
+        if not config["provider"] or len(config["provider"]) > 50:
+            raise ValueError("服务商名称不能为空且不能超过 50 个字符")
+        if not config["model"] or len(config["model"]) > 120:
+            raise ValueError("模型名不能为空且不能超过 120 个字符")
+        if not config["api_key"]:
+            raise ValueError("API Key 不能为空")
+        if any("\n" in value or "\r" in value for value in config.values()):
+            raise ValueError("模型配置不能包含换行符")
+        return config
+
+    def config(self) -> dict[str, Any]:
+        config = self._config()
+        configured = all(config.values())
+        return {
+            "provider": config["provider"],
+            "base_url": config["base_url"],
+            "model": config["model"],
+            "configured": configured,
+            "has_api_key": bool(config["api_key"]),
+        }
+
+    def save_config(self, provider: str, base_url: str, api_key: str, model: str) -> dict[str, Any]:
+        api_key = api_key.strip() or self._config()["api_key"]
+        config = self._validated_config(provider, base_url, api_key, model)
+        write_env(
+            self.config_path,
+            {
+                "AI_PROVIDER": config["provider"],
+                "AI_BASE_URL": config["base_url"],
+                "AI_API_KEY": config["api_key"],
+                "AI_MODEL": config["model"],
+            },
+        )
+        self._client = None
+        self._client_signature = None
+        self._cache.clear()
+        return self.config()
+
+    @staticmethod
+    def _request(config: Mapping[str, str], messages: list[dict[str, str]], max_tokens: int) -> dict[str, Any]:
+        request: dict[str, Any] = {
+            "model": config["model"],
+            "messages": messages,
+            "max_tokens": max_tokens,
+        }
+        if config["model"].lower().startswith("kimi-"):
             request["extra_body"] = {"thinking": {"type": "disabled"}}
-        response = self._client.chat.completions.create(**request)
+        return request
+
+    @staticmethod
+    def _new_client(config: Mapping[str, str]):
+        from openai import OpenAI
+
+        return OpenAI(
+            api_key=config["api_key"],
+            base_url=config["base_url"],
+            timeout=30.0,
+            max_retries=0,
+        )
+
+    def test_config(
+        self,
+        provider: str | None = None,
+        base_url: str | None = None,
+        api_key: str = "",
+        model: str | None = None,
+    ) -> dict[str, Any]:
+        current = self._config()
+        config = self._validated_config(
+            provider if provider is not None else current["provider"],
+            base_url if base_url is not None else current["base_url"],
+            api_key or current["api_key"],
+            model if model is not None else current["model"],
+        )
+        client = self._new_client(config)
+        try:
+            client.chat.completions.create(
+                **self._request(
+                    config,
+                    [{"role": "user", "content": "只回复 OK"}],
+                    max_tokens=8,
+                )
+            )
+        except Exception as exc:
+            message = (str(exc) or type(exc).__name__).replace(config["api_key"], "***")
+            raise RuntimeError(message) from exc
+        return {"ok": True, "provider": config["provider"], "model": config["model"]}
+
+    def _provider_complete(self, messages: list[dict[str, str]]) -> str:
+        config = self._validated_config(**self._config())
+        signature = (config["base_url"], config["api_key"])
+        if self._client is None or self._client_signature != signature:
+            self._client = self._new_client(config)
+            self._client_signature = signature
+        response = self._client.chat.completions.create(
+            **self._request(config, messages, max_tokens=120)
+        )
         return response.choices[0].message.content or ""
 
     def generate(
@@ -225,7 +369,7 @@ class DraftService:
             result = {
                 "status": "error",
                 "text": "",
-                "reason": f"Kimi 生成失败：{type(exc).__name__}",
+                "reason": f"AI 生成失败：{type(exc).__name__}",
                 "sources": source_meta,
                 "fingerprint": fingerprint,
             }

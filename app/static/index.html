@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>招聘协同台</title>
-    <link rel="stylesheet" href="/static/app.css?v=2026071704">
+    <link rel="stylesheet" href="/static/app.css?v=2026071705">
   </head>
   <body>
     <main id="login-view" class="login-shell">
@@ -51,6 +51,10 @@
         <button id="knowledge-button" class="rail-button" type="button" title="知识库" aria-label="知识库">
           <svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           <span class="rail-label">知识库</span>
+        </button>
+        <button id="model-button" class="rail-button" type="button" title="AI 模型" aria-label="AI 模型">
+          <svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/><circle cx="12" cy="12" r="4"/></svg>
+          <span class="rail-label">AI 模型</span>
         </button>
         <div class="rail-spacer"></div>
         <div class="rail-connection" title="BOSS 连接状态"><span id="rail-status" class="rail-status offline"></span><span>BOSS 连接</span></div>
@@ -101,7 +105,7 @@
             </div>
             <div class="conversation-meta">
               <span id="semantic-chip" class="system-chip">语义检索</span>
-              <span id="ai-chip" class="system-chip">Kimi</span>
+              <span id="ai-chip" class="system-chip">AI 未配置</span>
               <span id="connection-chip" class="system-chip offline">BOSS 未连接</span>
             </div>
           </header>
@@ -210,6 +214,25 @@
       <div id="knowledge-list" class="drawer-list"></div>
     </aside>
 
+    <aside id="model-drawer" class="side-drawer model-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="model-heading">
+      <header class="drawer-header"><div><p class="section-label">本机 AI 服务</p><h2 id="model-heading">AI 模型设置</h2></div><button id="model-close" class="quiet-icon-button" type="button" aria-label="关闭">×</button></header>
+      <form id="model-form" class="model-form">
+        <p class="model-intro">接入 OpenAI 兼容接口。配置只保存在当前电脑，API Key 不会在页面中回显。</p>
+        <label for="model-provider">服务商名称</label>
+        <input id="model-provider" maxlength="50" placeholder="例如：DeepSeek、通义千问、自建模型" required>
+        <label for="model-base-url">Base URL</label>
+        <input id="model-base-url" type="url" maxlength="500" placeholder="https://api.example.com/v1" required>
+        <label for="model-api-key">API Key</label>
+        <input id="model-api-key" type="password" maxlength="4000" autocomplete="new-password" placeholder="输入 API Key">
+        <small id="model-key-note" class="model-help">尚未保存 API Key</small>
+        <label for="model-name">模型名</label>
+        <input id="model-name" maxlength="120" placeholder="服务商提供的模型标识" required>
+        <p id="model-current" class="model-current">尚未配置</p>
+        <p id="model-feedback" class="model-feedback" role="status"></p>
+        <div class="model-actions"><button id="model-test" class="secondary-button" type="button">测试连接</button><button class="primary-small-button" type="submit">保存配置</button></div>
+      </form>
+    </aside>
+
     <dialog id="candidate-dialog" class="candidate-dialog">
       <form id="new-candidate-form" method="dialog">
         <header><div><p class="section-label">微信跟进</p><h2>新建候选人</h2></div><button id="candidate-dialog-close" class="quiet-icon-button" type="button" aria-label="关闭">×</button></header>
@@ -222,6 +245,6 @@
     </dialog>
 
     <div id="toast" class="toast hidden" role="status"></div>
-    <script src="/static/app.js?v=2026071704" defer></script>
+    <script src="/static/app.js?v=2026071705" defer></script>
   </body>
 </html>

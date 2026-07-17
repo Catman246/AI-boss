@@ -48,6 +48,9 @@ const elements = {
   knowledgeList: $("#knowledge-list"), knowledgeCount: $("#knowledge-count"), knowledgeForm: $("#knowledge-form"), knowledgeId: $("#knowledge-id"),
   knowledgeTitle: $("#knowledge-title"), knowledgeKeywords: $("#knowledge-keywords"), knowledgeContent: $("#knowledge-content"),
   knowledgeEnabled: $("#knowledge-enabled"), knowledgeCancel: $("#knowledge-cancel"), knowledgeFeedback: $("#knowledge-feedback"),
+  modelButton: $("#model-button"), modelDrawer: $("#model-drawer"), modelClose: $("#model-close"), modelForm: $("#model-form"),
+  modelProvider: $("#model-provider"), modelBaseUrl: $("#model-base-url"), modelApiKey: $("#model-api-key"), modelName: $("#model-name"),
+  modelKeyNote: $("#model-key-note"), modelCurrent: $("#model-current"), modelFeedback: $("#model-feedback"), modelTest: $("#model-test"),
   candidateDialog: $("#candidate-dialog"), newCandidateForm: $("#new-candidate-form"), candidateDialogClose: $("#candidate-dialog-close"),
   newName: $("#new-name"), newJob: $("#new-job"), newWechat: $("#new-wechat"), newCandidateFeedback: $("#new-candidate-feedback"), toast: $("#toast"),
 };
@@ -94,7 +97,7 @@ function showLogin() {
 function showApp() { elements.loginView.classList.add("hidden"); elements.appView.classList.remove("hidden"); }
 
 function setActiveRail(button) {
-  for (const item of [elements.conversationButton, elements.taskButton, elements.greetingButton, elements.knowledgeButton]) item.classList.toggle("active", item === button);
+  for (const item of [elements.conversationButton, elements.taskButton, elements.greetingButton, elements.knowledgeButton, elements.modelButton]) item.classList.toggle("active", item === button);
 }
 
 function updateSendState() {
@@ -122,8 +125,8 @@ async function loadSystemStatus() {
   try { updateConnection(await api("/api/status")); } catch (error) { updateConnection({ connected: false, logged_in: false, message: error.message }); }
   try {
     const status = await api("/api/ai/status"); state.aiConfigured = Boolean(status.configured);
-    elements.aiChip.textContent = state.aiConfigured ? status.model : "Kimi 未配置"; elements.aiChip.classList.toggle("online", state.aiConfigured);
-  } catch (_error) { elements.aiChip.textContent = "Kimi 不可用"; }
+    elements.aiChip.textContent = state.aiConfigured ? status.model : "AI 未配置"; elements.aiChip.classList.toggle("online", state.aiConfigured);
+  } catch (_error) { elements.aiChip.textContent = "AI 状态未知"; }
   try {
     const status = await api("/api/knowledge/status"); state.semanticReady = Boolean(status.ready);
     elements.semanticChip.textContent = state.semanticReady ? "BGE 语义检索" : "词法检索降级"; elements.semanticChip.classList.toggle("online", state.semanticReady);
@@ -336,7 +339,7 @@ function renderTasks() {
   }
 }
 
-function closeDrawers() { elements.taskDrawer.classList.add("hidden"); elements.greetingDrawer.classList.add("hidden"); elements.knowledgeDrawer.classList.add("hidden"); elements.drawerBackdrop.classList.add("hidden"); }
+function closeDrawers() { elements.taskDrawer.classList.add("hidden"); elements.greetingDrawer.classList.add("hidden"); elements.knowledgeDrawer.classList.add("hidden"); elements.modelDrawer.classList.add("hidden"); elements.drawerBackdrop.classList.add("hidden"); }
 
 async function switchBossView(view) {
   return api(view === "chat" ? "/api/boss/view/chat" : "/api/boss/view/recommend", { method: "POST" });
@@ -487,6 +490,39 @@ async function saveKnowledge(event) {
   catch (error) { elements.knowledgeFeedback.textContent = error.message; }
 }
 
+function modelPayload() {
+  return { provider: elements.modelProvider.value, base_url: elements.modelBaseUrl.value, api_key: elements.modelApiKey.value, model: elements.modelName.value };
+}
+
+async function loadModelConfig() {
+  const config = await api("/api/ai/config");
+  elements.modelProvider.value = config.provider || ""; elements.modelBaseUrl.value = config.base_url || ""; elements.modelName.value = config.model || ""; elements.modelApiKey.value = "";
+  elements.modelApiKey.placeholder = config.has_api_key ? "已保存，留空保持不变" : "输入 API Key";
+  elements.modelKeyNote.textContent = config.has_api_key ? "API Key 已保存在本机，留空不会覆盖" : "尚未保存 API Key";
+  elements.modelCurrent.textContent = config.configured ? `当前使用：${config.provider} · ${config.model}` : "当前未配置 AI 模型";
+  elements.modelFeedback.textContent = ""; elements.modelFeedback.classList.remove("error");
+}
+
+async function openModelSettings() {
+  await closeActiveDrawer(); setActiveRail(elements.modelButton);
+  try { await loadModelConfig(); elements.modelDrawer.classList.remove("hidden"); elements.drawerBackdrop.classList.remove("hidden"); }
+  catch (error) { showToast(error.message); }
+}
+
+async function testModelConfig() {
+  if (!elements.modelForm.reportValidity()) return;
+  elements.modelTest.disabled = true; elements.modelFeedback.textContent = "正在测试连接…"; elements.modelFeedback.classList.remove("error");
+  try { const result = await api("/api/ai/config/test", { method: "POST", body: JSON.stringify(modelPayload()) }); elements.modelFeedback.textContent = `${result.provider} · ${result.model} 连接成功`; }
+  catch (error) { elements.modelFeedback.textContent = error.message; elements.modelFeedback.classList.add("error"); }
+  finally { elements.modelTest.disabled = false; }
+}
+
+async function saveModelConfig(event) {
+  event.preventDefault(); elements.modelFeedback.textContent = "正在保存…"; elements.modelFeedback.classList.remove("error");
+  try { const config = await api("/api/ai/config", { method: "PUT", body: JSON.stringify(modelPayload()) }); await loadSystemStatus(); await loadModelConfig(); elements.modelCurrent.textContent = `当前使用：${config.provider} · ${config.model}`; elements.modelFeedback.textContent = "配置已保存并立即生效"; showToast("AI 模型配置已保存"); }
+  catch (error) { elements.modelFeedback.textContent = error.message; elements.modelFeedback.classList.add("error"); }
+}
+
 async function createCandidate(event) {
   event.preventDefault(); elements.newCandidateFeedback.textContent = "";
   try { const candidate = await api("/api/candidates", { method: "POST", body: JSON.stringify({ name: elements.newName.value, job: elements.newJob.value, wechat_id: elements.newWechat.value }) }); elements.candidateDialog.close(); elements.newCandidateForm.reset(); if (state.channel !== "wechat") await switchAgent("wechat"); else await loadCandidates(false); await selectContact(candidate.id); }
@@ -508,7 +544,7 @@ elements.newCandidateButton.addEventListener("click", () => elements.candidateDi
 elements.sendButton.addEventListener("click", sendMessage); elements.adoptDraft.addEventListener("click", adoptDraft); elements.regenerateDraft.addEventListener("click", () => generateDraft(true)); elements.ignoreDraft.addEventListener("click", ignoreDraft);
 elements.modeReply.addEventListener("click", () => { state.messageMode = "reply"; updateMessageMode(); }); elements.modeIncoming.addEventListener("click", () => { state.messageMode = "incoming"; clearDraft(); updateMessageMode(); });
 elements.candidateForm.addEventListener("submit", saveCandidate); elements.interviewForm.addEventListener("submit", scheduleInterview);
-elements.conversationButton.addEventListener("click", openConversations); elements.taskButton.addEventListener("click", openTasks); elements.taskClose.addEventListener("click", closeActiveDrawer); elements.greetingButton.addEventListener("click", openGreetings); elements.greetingClose.addEventListener("click", closeActiveDrawer); elements.greetingNewPlan.addEventListener("click", () => openGreetingForm()); elements.greetingPlanCancel.addEventListener("click", closeGreetingForm); elements.greetingForm.addEventListener("submit", saveGreetingPlan); elements.knowledgeButton.addEventListener("click", openKnowledge); elements.knowledgeClose.addEventListener("click", closeActiveDrawer); elements.drawerBackdrop.addEventListener("click", closeActiveDrawer);
+elements.conversationButton.addEventListener("click", openConversations); elements.taskButton.addEventListener("click", openTasks); elements.taskClose.addEventListener("click", closeActiveDrawer); elements.greetingButton.addEventListener("click", openGreetings); elements.greetingClose.addEventListener("click", closeActiveDrawer); elements.greetingNewPlan.addEventListener("click", () => openGreetingForm()); elements.greetingPlanCancel.addEventListener("click", closeGreetingForm); elements.greetingForm.addEventListener("submit", saveGreetingPlan); elements.knowledgeButton.addEventListener("click", openKnowledge); elements.knowledgeClose.addEventListener("click", closeActiveDrawer); elements.modelButton.addEventListener("click", openModelSettings); elements.modelClose.addEventListener("click", closeActiveDrawer); elements.modelTest.addEventListener("click", testModelConfig); elements.modelForm.addEventListener("submit", saveModelConfig); elements.drawerBackdrop.addEventListener("click", closeActiveDrawer);
 elements.greetingStartAt.addEventListener("input", validateGreetingWindow); elements.greetingEndAt.addEventListener("input", validateGreetingWindow);
 elements.knowledgeForm.addEventListener("submit", saveKnowledge); elements.knowledgeCancel.addEventListener("click", resetKnowledgeForm);
 elements.messageInput.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); sendMessage(); } });

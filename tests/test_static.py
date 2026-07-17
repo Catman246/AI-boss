@@ -37,6 +37,14 @@ class StaticUiTests(unittest.TestCase):
             "greeting-start-at",
             "greeting-end-at",
             "greeting-plan-cancel",
+            "model-button",
+            "model-drawer",
+            "model-form",
+            "model-provider",
+            "model-base-url",
+            "model-api-key",
+            "model-name",
+            "model-test",
         ):
             self.assertIn(f'id="{element_id}"', html)
 
@@ -50,13 +58,14 @@ class StaticUiTests(unittest.TestCase):
             ("task-button", "交接任务"),
             ("greeting-button", "主动招呼"),
             ("knowledge-button", "知识库"),
+            ("model-button", "AI 模型"),
             ("logout-button", "退出登录"),
         ):
             self.assertRegex(
                 html,
                 rf'id="{element_id}"[^>]*>[\s\S]*?<span class="rail-label">{label}</span>',
             )
-        self.assertEqual(html.count('class="rail-icon"'), 5)
+        self.assertEqual(html.count('class="rail-icon"'), 6)
         self.assertIn("grid-template-columns: 132px", css)
         self.assertIn('/api/boss/view/chat', javascript)
         self.assertIn('/api/boss/view/recommend', javascript)
@@ -128,6 +137,16 @@ class StaticUiTests(unittest.TestCase):
         self.assertIn('api("/api/knowledge")', javascript)
         self.assertIn('method: "PATCH"', javascript)
         self.assertIn('method: "DELETE"', javascript)
+
+    def test_ai_model_drawer_uses_masked_openai_compatible_config(self):
+        html = (STATIC / "index.html").read_text(encoding="utf-8")
+        javascript = (STATIC / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("OpenAI 兼容接口", html)
+        self.assertRegex(html, r'id="model-api-key"[^>]*type="password"')
+        self.assertIn('api("/api/ai/config")', javascript)
+        self.assertIn('api("/api/ai/config/test"', javascript)
+        self.assertNotIn("innerHTML", javascript)
 
     def test_two_agents_share_candidate_api_and_review_tasks(self):
         javascript = (STATIC / "app.js").read_text(encoding="utf-8")

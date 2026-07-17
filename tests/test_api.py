@@ -96,9 +96,34 @@ class FakeKnowledge:
 class FakeDrafts:
     def __init__(self):
         self.calls = []
+        self.saved_configs = []
+        self.tested_configs = []
 
     def status(self):
-        return {"configured": True, "model": "kimi-test"}
+        return {"configured": True, "model": "kimi-test", "provider": "Kimi"}
+
+    def config(self):
+        return {
+            "provider": "Kimi",
+            "base_url": "https://api.moonshot.cn/v1",
+            "model": "kimi-test",
+            "configured": True,
+            "has_api_key": True,
+        }
+
+    def save_config(self, provider, base_url, api_key, model):
+        self.saved_configs.append((provider, base_url, api_key, model))
+        return {
+            "provider": provider,
+            "base_url": base_url,
+            "model": model,
+            "configured": True,
+            "has_api_key": True,
+        }
+
+    def test_config(self, provider=None, base_url=None, api_key="", model=None):
+        self.tested_configs.append((provider, base_url, api_key, model))
+        return {"ok": True, "model": model or "kimi-test"}
 
     def generate(self, contact_key, job, messages, force=False, agent="boss"):
         self.calls.append((contact_key, job, messages, force))
@@ -314,8 +339,44 @@ class ApiTests(unittest.TestCase):
         self.login()
         response = self.client.get("/api/ai/status")
 
-        self.assertEqual(response.json(), {"configured": True, "model": "kimi-test"})
+        self.assertEqual(
+            response.json(),
+            {"configured": True, "model": "kimi-test", "provider": "Kimi"},
+        )
         self.assertNotIn("key", response.text.lower())
+
+    def test_ai_model_config_can_be_read_tested_and_updated_without_exposing_key(self):
+        self.assertEqual(self.client.get("/api/ai/config").status_code, 401)
+        self.login()
+
+        current = self.client.get("/api/ai/config")
+        tested = self.client.post(
+            "/api/ai/config/test",
+            json={
+                "provider": "自定义模型",
+                "base_url": "https://api.example.com/v1",
+                "api_key": "sk-test",
+                "model": "chat-model",
+            },
+        )
+        saved = self.client.put(
+            "/api/ai/config",
+            json={
+                "provider": "自定义模型",
+                "base_url": "https://api.example.com/v1",
+                "api_key": "sk-test",
+                "model": "chat-model",
+            },
+        )
+
+        self.assertEqual(current.status_code, 200)
+        self.assertTrue(tested.json()["ok"])
+        self.assertEqual(saved.json()["model"], "chat-model")
+        self.assertNotIn("sk-test", current.text + tested.text + saved.text)
+        self.assertEqual(
+            self.drafts.saved_configs,
+            [("自定义模型", "https://api.example.com/v1", "sk-test", "chat-model")],
+        )
 
     def test_knowledge_crud_is_authenticated_and_validated(self):
         self.assertEqual(self.client.get("/api/knowledge").status_code, 401)

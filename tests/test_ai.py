@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from app.ai import DraftService, build_prompt, message_fingerprint, quality_issues
 from app.knowledge import KnowledgeStore
@@ -135,6 +136,97 @@ class AiDraftTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "idle")
         self.assertEqual(complete.calls, [])
+
+    def test_model_config_is_saved_masked_and_blank_key_is_retained(self):
+        config_path = Path(self.directory.name) / "ai.env"
+        service = DraftService(self.store, config_path=config_path, environ={})
+
+        saved = service.save_config(
+            provider="自定义模型",
+            base_url="https://api.example.com/v1/chat/completions",
+            api_key="sk-local-secret",
+            model="chat-model",
+        )
+        updated = service.save_config(
+            provider="自定义模型",
+            base_url="https://api.example.com/v1",
+            api_key="",
+            model="chat-model-v2",
+        )
+
+        self.assertEqual(saved["base_url"], "https://api.example.com/v1")
+        self.assertTrue(saved["has_api_key"])
+        self.assertNotIn("sk-local-secret", str(saved))
+        self.assertEqual(updated["model"], "chat-model-v2")
+        self.assertIn("AI_API_KEY=sk-local-secret", config_path.read_text(encoding="utf-8"))
+
+    def test_saved_model_config_takes_effect_without_restart(self):
+        config_path = Path(self.directory.name) / "ai.env"
+        service = DraftService(self.store, config_path=config_path, environ={})
+        service.save_config("服务 A", "https://a.example/v1", "key-a", "model-a")
+
+        first_client = MagicMock()
+        first_client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content="OK"))
+        ]
+        second_client = MagicMock()
+        second_client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content="OK"))
+        ]
+        with patch("openai.OpenAI", side_effect=[first_client, second_client]) as factory:
+            service.test_config()
+            service.save_config("服务 B", "https://b.example/v1", "key-b", "model-b")
+            service.test_config()
+
+        self.assertEqual(factory.call_args_list[0].kwargs["base_url"], "https://a.example/v1")
+        self.assertEqual(factory.call_args_list[1].kwargs["base_url"], "https://b.example/v1")
+        self.assertEqual(first_client.chat.completions.create.call_args.kwargs["model"], "model-a")
+        self.assertEqual(second_client.chat.completions.create.call_args.kwargs["model"], "model-b")
+
+    def test_legacy_kimi_environment_is_used_as_first_run_default(self):
+        service = DraftService(
+            self.store,
+            config_path=Path(self.directory.name) / "missing.env",
+            environ={
+                "MOONSHOT_API_KEY": "legacy-key",
+                "KIMI_BASE_URL": "https://api.moonshot.cn/v1",
+                "KIMI_MODEL": "kimi-k2.6",
+            },
+        )
+
+        self.assertEqual(
+            service.config(),
+            {
+                "provider": "Kimi",
+                "base_url": "https://api.moonshot.cn/v1",
+                "model": "kimi-k2.6",
+                "configured": True,
+                "has_api_key": True,
+            },
+        )
+
+    def test_connection_error_does_not_expose_api_key(self):
+        service = DraftService(
+            self.store,
+            config_path=Path(self.directory.name) / "ai.env",
+            environ={},
+        )
+        client = MagicMock()
+        client.chat.completions.create.side_effect = RuntimeError(
+            "认证失败：sk-local-secret"
+        )
+
+        with patch("openai.OpenAI", return_value=client):
+            with self.assertRaises(RuntimeError) as raised:
+                service.test_config(
+                    "自定义模型",
+                    "https://api.example.com/v1",
+                    "sk-local-secret",
+                    "chat-model",
+                )
+
+        self.assertNotIn("sk-local-secret", str(raised.exception))
+        self.assertIn("***", str(raised.exception))
 
 
 if __name__ == "__main__":
